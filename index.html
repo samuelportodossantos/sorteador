@@ -201,10 +201,10 @@ function similarity(a,b){
   if((prefixo(ta,tb)||prefixo(tb,ta))&&(ta.length>1||tb.length>1||Math.min(a.length,b.length)>=4))return .9;
   return 1-lev(a,b)/Math.max(a.length,b.length);
 }
-function findMatch(name){
+function buscar(lista,name){
   const n=norm(name);if(!n)return null;
   let best=null,second=0;
-  for(const e of saved){
+  for(const e of lista){
     const sc=similarity(n,norm(e.name));
     if(!best||sc>best.score){second=best?best.score:0;best={entry:e,score:sc}}
     else if(sc>second)second=sc;
@@ -214,6 +214,17 @@ function findMatch(name){
   if(best.score<need)return null;
   if(best.score<1&&second===best.score)return null; // empate duvidoso: não chuta
   return best;
+}
+function findMatch(name){return buscar(saved,name)}
+
+// grupos que NÃO podem cair todos no mesmo time (no máximo 2 do grupo juntos)
+const GRUPOS=[["Julio Jr","Jhonny Mendes","Samuel"]];
+const GRUPO_ENTRIES=GRUPOS.flatMap((g,i)=>g.map(name=>({name,g:i})));
+function valido(times){
+  return times.every(t=>{
+    const c={};for(const p of t)if(p.grupo!=null)c[p.grupo]=(c[p.grupo]||0)+1;
+    return Object.values(c).every(n=>n<=2);
+  });
 }
 function guardar(p){
   if(p.w==null&&!p.pos)return;
@@ -245,7 +256,8 @@ function renderPesos(){
     d.innerHTML='<span class="nm"><span></span><small></small></span><select class="ps"></select><select class="ws"></select>';
     d.querySelector(".nm span").textContent=p.name;
     const sm=d.querySelector("small");
-    if(p.via)sm.textContent="≈ "+p.via;else sm.remove();
+    const notas=[];if(p.via)notas.push("≈ "+p.via);if(p.grupo!=null)notas.push("⛓ não cai junto com os outros do grupo");
+    if(notas.length)sm.textContent=notas.join(" · ");else sm.remove();
     const sel=d.querySelector(".ws");
     sel.innerHTML='<option value="">—</option>'+Array.from({length:9},(_,i)=>{const v=1+i/2;return `<option value="${v}">${String(v).replace(".",",")}</option>`}).join("");
     sel.value=p.w==null?"":String(p.w);
@@ -285,6 +297,7 @@ function balancear(pool,size){
     let pen=0;
     if(temPos){const ds=t.map(x=>x.reduce((a,p)=>a+D(p),0));pen=Math.max(...ds)-Math.min(...ds)}
     const cost=spread*2+pen;
+    if(!valido(t))continue;
     const key=t.map(x=>x.map(p=>p.name).sort().join(",")).sort().join("|");
     if(key===lastKey)continue; // não repete o sorteio anterior
     if(cost<min)min=cost;
@@ -293,6 +306,7 @@ function balancear(pool,size){
   // pega TODAS as combinações boas (não só a melhor) e sorteia entre elas: equilibrado, mas variado
   let tol=0,ok=[];
   while(tol<=6){ok=cands.filter(c=>c.cost<=min+tol);if(ok.length>=60)break;tol+=.5}
+  if(!ok.length){const t=[0,1,2].map(j=>pool.slice(j*size,(j+1)*size));return {t,sums:t.map(x=>x.reduce((a,p)=>a+(p.w==null?DEFAULT_W:p.w),0))}}
   const r=ok[rnd(ok.length)];
   lastKey=r.t.map(x=>x.map(p=>p.name).sort().join(",")).sort().join("|");
   return r;
@@ -308,7 +322,11 @@ function draw(){
   const usar=$("eq").checked&&pool.some(p=>p.w!=null);
   let teams,sums=null;
   if(usar){const r=balancear(pool,state.size);teams=r.t.map(t=>t.map(p=>p.name));sums=r.sums}
-  else teams=[0,1,2].map(i=>pool.slice(i*state.size,(i+1)*state.size).map(p=>p.name));
+  else{
+    let t;
+    for(let k=0;k<3000;k++){const sp=shuffle(pool);t=[0,1,2].map(i=>sp.slice(i*state.size,(i+1)*state.size));if(valido(t))break}
+    teams=t.map(x=>x.map(p=>p.name));
+  }
   last={teams,sup,sums};
   $("resultado").classList.remove("hidden");
   const t=$("teams");t.classList.add("shake");
@@ -370,7 +388,8 @@ function parseList(text){
 function importar(){
   const p=parseList($("paste").value).map(x=>{
     const m=findMatch(x.name);
-    return {name:x.name,w:m&&m.entry.w!=null?m.entry.w:null,pos:m?m.entry.pos||null:null,via:m&&m.score<1&&norm(m.entry.name)!==norm(x.name)?m.entry.name:null};
+    const gm=buscar(GRUPO_ENTRIES,x.name);
+    return {name:x.name,grupo:gm?gm.entry.g:null,w:m&&m.entry.w!=null?m.entry.w:null,pos:m?m.entry.pos||null:null,via:m&&m.score<1&&norm(m.entry.name)!==norm(x.name)?m.entry.name:null};
   });
   state.players=p;render();last=null;$("resultado").classList.add("hidden");
 }
