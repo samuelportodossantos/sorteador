@@ -84,6 +84,20 @@
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#1d2a47;border:1px solid var(--line);
     padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:.25s}
   .toast.show{opacity:1}
+  .sw{position:relative;display:inline-block;width:46px;height:26px;flex:none}
+  .sw input{opacity:0;width:0;height:0;position:absolute}
+  .sw span{position:absolute;inset:0;background:#1d2a47;border:1px solid var(--line);border-radius:26px;transition:.2s;cursor:pointer}
+  .sw span:before{content:"";position:absolute;height:18px;width:18px;left:3px;top:3px;background:#8b97b8;border-radius:50%;transition:.2s}
+  .sw input:checked+span{background:#0f2a2b;border-color:var(--accent)}
+  .sw input:checked+span:before{transform:translateX(20px);background:var(--accent)}
+  .pesos{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;margin:12px 0}
+  .pw{display:flex;align-items:center;gap:8px;background:#0d1527;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+  .pw.new{border-color:#7a5b1e}
+  .pw .nm{flex:1;min-width:0;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pw .nm small{display:block;color:var(--mut);font-size:11px}
+  .pw select.ps{max-width:70px}
+  .pw select{background:#0d1527;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px;font-size:15px}
+  details summary{cursor:pointer;font-size:14px;margin-top:12px}
   @media(max-width:480px){.row{grid-template-columns:1fr}}
 </style>
 </head>
@@ -109,6 +123,16 @@
     </div>
   </section>
 
+  <section class="card hidden" id="pesosCard">
+    <h2>⚖️ Equilibrar times <label class="sw"><input type="checkbox" id="eq" checked><span></span></label></h2>
+    <p class="sub" style="margin:0">Peso de 1 a 5 (aceita meio ponto) e posição de cada jogador. Nome novo, sem peso, conta como peso 1. O app guarda no seu celular e reconhece nomes parecidos.</p>
+    <details id="pesosDet">
+      <summary>Pesos dos jogadores</summary>
+      <div class="pesos" id="pesos"></div>
+      <button class="btn sec" id="limpaPesos" style="width:100%">Limpar pesos salvos</button>
+    </details>
+  </section>
+
   <button class="btn big" id="sortear">🎲 Sortear times</button>
 
   <section class="card hidden" id="resultado" style="margin-top:16px">
@@ -132,7 +156,74 @@ const EMOJI=["🔵","🔴","⚫"];
 const $=id=>document.getElementById(id);
 let state={players:[],size:6};
 let last=null;
-function save(){} // nada é salvo: F5 limpa tudo
+function save(){} // a lista não é salva: F5 limpa. Só os pesos ficam no aparelho.
+const DEFAULT_W=1, LS="sorteador-pesos", LS_EQ="sorteador-eq";
+// pesos iniciais (1 a 5) e posição: d = defensor, a = atacante, x = flex (qualquer posição)
+const SEED=[["Davy","d",5],["Cleison","a",5],["Pedro","d",4],["Diogo","d",3],["Jony Ar","a",3],["Jhonny Mendes","x",2],
+  ["Zairon","x",3],["Julio Jr","a",2],["Samuel","x",3.5],["Denis","a",4],["Gabriel","a",3],["Alisson","a",3],
+  ["Brendo","x",4],["Elisson","a",5],["Rafael","x",2],["Levi","d",3],["Danilo","a",3],["Valber","a",3]]
+  .map(([name,pos,w])=>({name,pos,w}));
+let saved=[];
+try{
+  const raw=localStorage.getItem(LS);
+  if(raw===null){saved=SEED.map(x=>({...x}));persist()}
+  else{const v=JSON.parse(raw);if(Array.isArray(v))saved=v}
+}catch(e){saved=SEED.map(x=>({...x}))}
+function persist(){try{localStorage.setItem(LS,JSON.stringify(saved))}catch(e){}}
+
+// normaliza para comparar nomes parecidos (jhonny = johnny, Davy = Davi, acentos, maiúsculas)
+function norm(s){
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/[^a-z0-9 ]/g," ").replace(/ph/g,"f").replace(/h/g,"").replace(/y/g,"i").replace(/k/g,"c")
+    .replace(/(.)\1+/g,"$1").replace(/\s+/g," ").trim();
+}
+function lev(a,b){
+  const m=a.length,n=b.length;if(!m)return n;if(!n)return m;
+  let prev=Array.from({length:n+1},(_,j)=>j);
+  for(let i=1;i<=m;i++){const cur=[i];
+    for(let j=1;j<=n;j++)cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));
+    prev=cur}
+  return prev[n];
+}
+// "jr" é abreviação de "junior", "ar" de "arthur", "samuel" de "samuel porto"
+function abrev(t,u){
+  if(t===u)return true;
+  if(t.length<2||t[0]!==u[0])return false;
+  if(u.startsWith(t))return true;
+  if(t.length>3)return false;
+  let i=0;for(const c of u)if(c===t[i])i++;
+  return i===t.length;
+}
+function prefixo(x,y){return x.length<=y.length&&x.every((t,i)=>abrev(t,y[i]))}
+function similarity(a,b){
+  if(a===b)return 1;
+  const ta=a.split(" "),tb=b.split(" ");
+  if((prefixo(ta,tb)||prefixo(tb,ta))&&(ta.length>1||tb.length>1||Math.min(a.length,b.length)>=4))return .9;
+  return 1-lev(a,b)/Math.max(a.length,b.length);
+}
+function findMatch(name){
+  const n=norm(name);if(!n)return null;
+  let best=null,second=0;
+  for(const e of saved){
+    const sc=similarity(n,norm(e.name));
+    if(!best||sc>best.score){second=best?best.score:0;best={entry:e,score:sc}}
+    else if(sc>second)second=sc;
+  }
+  if(!best)return null;
+  const need=n.length<=5?.85:.8;
+  if(best.score<need)return null;
+  if(best.score<1&&second===best.score)return null; // empate duvidoso: não chuta
+  return best;
+}
+function guardar(p){
+  if(p.w==null&&!p.pos)return;
+  const n=norm(p.name);
+  const ex=saved.find(e=>norm(e.name)===n);
+  if(ex){ex.w=p.w;ex.pos=p.pos;ex.name=p.name}else saved.push({name:p.name,w:p.w,pos:p.pos});
+  persist();
+}
+function setWeight(p,w){p.w=w;guardar(p)}
+function setPos(p,pos){p.pos=pos;guardar(p)}
 
 let meta={local:"",data:"",hora:""};
 
@@ -142,21 +233,83 @@ function shuffle(arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=
 
 function render(){
   document.querySelectorAll(".mode").forEach(m=>m.classList.toggle("on",+m.dataset.size===state.size));
+  renderPesos();
 }
+function renderPesos(){
+  const card=$("pesosCard"),box=$("pesos");box.innerHTML="";
+  card.classList.toggle("hidden",!state.players.length);
+  let novos=0;
+  state.players.forEach(p=>{
+    const d=document.createElement("div");d.className="pw"+(p.w==null?" new":"");
+    if(p.w==null)novos++;
+    d.innerHTML='<span class="nm"><span></span><small></small></span><select class="ps"></select><select class="ws"></select>';
+    d.querySelector(".nm span").textContent=p.name;
+    const sm=d.querySelector("small");
+    if(p.via)sm.textContent="≈ "+p.via;else sm.remove();
+    const sel=d.querySelector(".ws");
+    sel.innerHTML='<option value="">—</option>'+Array.from({length:9},(_,i)=>{const v=1+i/2;return `<option value="${v}">${String(v).replace(".",",")}</option>`}).join("");
+    sel.value=p.w==null?"":String(p.w);
+    sel.onchange=()=>{setWeight(p,sel.value===""?null:+sel.value);d.classList.toggle("new",p.w==null)};
+    const ps=d.querySelector(".ps");
+    ps.innerHTML='<option value="">Pos.</option><option value="d">Def</option><option value="a">Atq</option><option value="x">Flex</option>';
+    ps.value=p.pos||"";
+    ps.onchange=()=>setPos(p,ps.value||null);
+    box.appendChild(d);
+  });
+  if(novos)$("pesosDet").open=true;
+}
+try{if(localStorage.getItem(LS_EQ)==="0")$("eq").checked=false}catch(e){}
+$("eq").onchange=()=>{try{localStorage.setItem(LS_EQ,$("eq").checked?"1":"0")}catch(e){}};
+let confirmClear=false;
+$("limpaPesos").onclick=()=>{
+  const b=$("limpaPesos");
+  if(!confirmClear){confirmClear=true;b.textContent="Toque de novo para confirmar";setTimeout(()=>{confirmClear=false;b.textContent="Limpar pesos salvos"},3000);return}
+  confirmClear=false;b.textContent="Limpar pesos salvos";
+  saved=[];persist();state.players.forEach(p=>{p.w=null;p.via=null});render();toast("Pesos apagados");
+};
 
 document.querySelectorAll(".mode").forEach(m=>m.onclick=()=>{state.size=+m.dataset.size;save();render()});
 
 function toast(t){const el=$("toast");el.textContent=t;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2200)}
 
+function balancear(pool,size){
+  const W=p=>p.w==null?DEFAULT_W:p.w;
+  const D=p=>p.pos==="d"?1:p.pos==="a"?0:.5; // "quanto defensor" o jogador é (sem posição = meio termo)
+  const temPos=pool.some(p=>p.pos);
+  const cands=[];let min=Infinity;
+  for(let i=0;i<5000;i++){
+    const sh=shuffle(pool);
+    const t=[0,1,2].map(j=>sh.slice(j*size,(j+1)*size));
+    const sums=t.map(x=>x.reduce((a,p)=>a+W(p),0));
+    const spread=Math.max(...sums)-Math.min(...sums);
+    let pen=0;
+    if(temPos){const ds=t.map(x=>x.reduce((a,p)=>a+D(p),0));pen=Math.max(...ds)-Math.min(...ds)}
+    const cost=spread*2+pen;
+    const key=t.map(x=>x.map(p=>p.name).sort().join(",")).sort().join("|");
+    if(key===lastKey)continue; // não repete o sorteio anterior
+    if(cost<min)min=cost;
+    cands.push({t,sums,cost});
+  }
+  // pega TODAS as combinações boas (não só a melhor) e sorteia entre elas: equilibrado, mas variado
+  let tol=0,ok=[];
+  while(tol<=6){ok=cands.filter(c=>c.cost<=min+tol);if(ok.length>=60)break;tol+=.5}
+  const r=ok[rnd(ok.length)];
+  lastKey=r.t.map(x=>x.map(p=>p.name).sort().join(",")).sort().join("|");
+  return r;
+}
+let lastKey="";
 function draw(){
-  const pool=state.players.filter(p=>p.on).map(p=>p.name);
+  const list=state.players;
   const need=state.size*3;
-  if(!pool.length){toast("Cole a lista primeiro");return}
-  if(pool.length<need){toast(`A lista tem ${pool.length} jogadores, precisa de ${need}`);return}
-  const sh=shuffle(pool);
-  const teams=[0,1,2].map(i=>sh.slice(i*state.size,(i+1)*state.size));
-  const sup=sh.slice(need);
-  last={teams,sup};
+  if(!list.length){toast("Cole a lista primeiro");return}
+  if(list.length<need){toast(`A lista tem ${list.length} jogadores, precisa de ${need}`);return}
+  const sh=shuffle(list);
+  const pool=sh.slice(0,need),sup=sh.slice(need).map(p=>p.name);
+  const usar=$("eq").checked&&pool.some(p=>p.w!=null);
+  let teams,sums=null;
+  if(usar){const r=balancear(pool,state.size);teams=r.t.map(t=>t.map(p=>p.name));sums=r.sums}
+  else teams=[0,1,2].map(i=>pool.slice(i*state.size,(i+1)*state.size).map(p=>p.name));
+  last={teams,sup,sums};
   $("resultado").classList.remove("hidden");
   const t=$("teams");t.classList.add("shake");
   setTimeout(()=>{t.classList.remove("shake");show()},450);
@@ -165,7 +318,7 @@ function show(){
   const t=$("teams");t.innerHTML="";
   last.teams.forEach((tm,i)=>{
     const d=document.createElement("div");d.className="team"+(i===2?" preto":"");d.style.setProperty("--c",COLORS[i]);
-    d.innerHTML=`<h3>${NAMES[i]} <small>${tm.length} jogadores</small></h3><ol></ol>`;
+    d.innerHTML=`<h3>${NAMES[i]} <small>${last.sums?"força "+last.sums[i]:tm.length+" jogadores"}</small></h3><ol></ol>`;
     tm.forEach((n,k)=>{const li=document.createElement("li");li.innerHTML=`<i>${k+1}</i><span></span>`;li.querySelector("span").textContent=n;d.querySelector("ol").appendChild(li)});
     t.appendChild(d);
   });
@@ -215,7 +368,10 @@ function parseList(text){
   return players;
 }
 function importar(){
-  const p=parseList($("paste").value);
+  const p=parseList($("paste").value).map(x=>{
+    const m=findMatch(x.name);
+    return {name:x.name,w:m&&m.entry.w!=null?m.entry.w:null,pos:m?m.entry.pos||null:null,via:m&&m.score<1&&norm(m.entry.name)!==norm(x.name)?m.entry.name:null};
+  });
   state.players=p;render();last=null;$("resultado").classList.add("hidden");
 }
 $("paste").addEventListener("input",importar);
