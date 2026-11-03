@@ -112,7 +112,9 @@
     <div class="actions">
       <button class="btn sec" id="resortear">🔁 Sortear de novo</button>
       <button class="btn wa" id="whats">📲 Enviar no WhatsApp</button>
+      <button class="btn sec" id="copyRes" style="grid-column:1/-1">📋 Copiar resultado</button>
     </div>
+    <textarea id="resBox" class="hidden" rows="12" readonly style="margin-top:10px"></textarea>
   </section>
 </div>
 <div class="toast" id="toast"></div>
@@ -245,7 +247,18 @@ $("tplBtn").onclick=async()=>{
   toast("Seu navegador bloqueou. Selecionei o texto: use Ctrl+C");
 };
 $("sortear").onclick=draw;$("resortear").onclick=draw;
-$("whats").onclick=()=>{if(!last)return;window.open("https://wa.me/?text="+encodeURIComponent(msg()),"_blank")};
+function abrirWa(text){window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(text),"_blank")}
+$("whats").onclick=()=>{
+  if(!last)return;const text=msg();
+  if(navigator.share&&/Android|iPhone|iPad/i.test(navigator.userAgent)){navigator.share({text}).catch(()=>{})}
+  else abrirWa(text);
+};
+$("copyRes").onclick=async()=>{
+  if(!last)return;const txt=msg();
+  if(await copiar(txt)){$("resBox").classList.add("hidden");toast("Resultado copiado! Cola no grupo");return}
+  const b=$("resBox");b.classList.remove("hidden");b.value=txt;b.focus();b.select();
+  toast("Seu navegador bloqueou. Selecionei o texto: use Ctrl+C");
+};
 render();
 </script>
 </body>
