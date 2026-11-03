@@ -84,20 +84,6 @@
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#1d2a47;border:1px solid var(--line);
     padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:.25s}
   .toast.show{opacity:1}
-  .sw{position:relative;display:inline-block;width:46px;height:26px;flex:none}
-  .sw input{opacity:0;width:0;height:0;position:absolute}
-  .sw span{position:absolute;inset:0;background:#1d2a47;border:1px solid var(--line);border-radius:26px;transition:.2s;cursor:pointer}
-  .sw span:before{content:"";position:absolute;height:18px;width:18px;left:3px;top:3px;background:#8b97b8;border-radius:50%;transition:.2s}
-  .sw input:checked+span{background:#0f2a2b;border-color:var(--accent)}
-  .sw input:checked+span:before{transform:translateX(20px);background:var(--accent)}
-  .pesos{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;margin:12px 0}
-  .pw{display:flex;align-items:center;gap:8px;background:#0d1527;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
-  .pw.new{border-color:#7a5b1e}
-  .pw .nm{flex:1;min-width:0;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .pw .nm small{display:block;color:var(--mut);font-size:11px}
-  .pw select.ps{max-width:70px}
-  .pw select{background:#0d1527;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px;font-size:15px}
-  details summary{cursor:pointer;font-size:14px;margin-top:12px}
   @media(max-width:480px){.row{grid-template-columns:1fr}}
 </style>
 </head>
@@ -121,16 +107,6 @@
       <button class="mode on" data-size="6"><b>3 times de 6</b><span>18 jogadores</span></button>
       <button class="mode" data-size="5"><b>3 times de 5</b><span>15 jogadores · sobra vira suplente</span></button>
     </div>
-  </section>
-
-  <section class="card hidden" id="pesosCard">
-    <h2>⚖️ Equilibrar times <label class="sw"><input type="checkbox" id="eq" checked><span></span></label></h2>
-    <p class="sub" style="margin:0">Peso de 1 a 5 (aceita meio ponto) e posição de cada jogador. Nome novo, sem peso, conta como peso 1. O app guarda no seu celular e reconhece nomes parecidos.</p>
-    <details id="pesosDet">
-      <summary>Pesos dos jogadores</summary>
-      <div class="pesos" id="pesos"></div>
-      <button class="btn sec" id="limpaPesos" style="width:100%">Limpar pesos salvos</button>
-    </details>
   </section>
 
   <button class="btn big" id="sortear">🎲 Sortear times</button>
@@ -157,19 +133,14 @@ const $=id=>document.getElementById(id);
 let state={players:[],size:6};
 let last=null;
 function save(){} // a lista não é salva: F5 limpa. Só os pesos ficam no aparelho.
-const DEFAULT_W=1, LS="sorteador-pesos", LS_EQ="sorteador-eq";
+const DEFAULT_W=1; // nome novo (que não está na lista de pesos) conta como o pior
 // pesos iniciais (1 a 5) e posição: d = defensor, a = atacante, x = flex (qualquer posição)
 const SEED=[["Davy","d",5],["Cleison","a",5],["Pedro","d",4],["Diogo","d",3],["Jony Ar","a",3],["Jhonny Mendes","x",2],
   ["Zairon","x",3],["Julio Jr","a",2],["Samuel","x",3.5],["Denis","a",4],["Gabriel","a",3],["Alisson","a",3],
   ["Brendo","x",4],["Elisson","a",5],["Rafael","x",2],["Levi","d",3],["Danilo","a",3],["Valber","a",3]]
   .map(([name,pos,w])=>({name,pos,w}));
-let saved=[];
-try{
-  const raw=localStorage.getItem(LS);
-  if(raw===null){saved=SEED.map(x=>({...x}));persist()}
-  else{const v=JSON.parse(raw);if(Array.isArray(v))saved=v}
-}catch(e){saved=SEED.map(x=>({...x}))}
-function persist(){try{localStorage.setItem(LS,JSON.stringify(saved))}catch(e){}}
+const saved=SEED;
+try{["sorteador-pesos","sorteador-eq"].forEach(k=>localStorage.removeItem(k))}catch(e){}
 
 // normaliza para comparar nomes parecidos (jhonny = johnny, Davy = Davi, acentos, maiúsculas)
 function norm(s){
@@ -226,16 +197,6 @@ function valido(times){
     return Object.values(c).every(n=>n<=2);
   });
 }
-function guardar(p){
-  if(p.w==null&&!p.pos)return;
-  const n=norm(p.name);
-  const ex=saved.find(e=>norm(e.name)===n);
-  if(ex){ex.w=p.w;ex.pos=p.pos;ex.name=p.name}else saved.push({name:p.name,w:p.w,pos:p.pos});
-  persist();
-}
-function setWeight(p,w){p.w=w;guardar(p)}
-function setPos(p,pos){p.pos=pos;guardar(p)}
-
 let meta={local:"",data:"",hora:""};
 
 function rnd(n){const a=new Uint32Array(1);const lim=Math.floor(4294967296/n)*n;
@@ -244,42 +205,7 @@ function shuffle(arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=
 
 function render(){
   document.querySelectorAll(".mode").forEach(m=>m.classList.toggle("on",+m.dataset.size===state.size));
-  renderPesos();
 }
-function renderPesos(){
-  const card=$("pesosCard"),box=$("pesos");box.innerHTML="";
-  card.classList.toggle("hidden",!state.players.length);
-  let novos=0;
-  state.players.forEach(p=>{
-    const d=document.createElement("div");d.className="pw"+(p.w==null?" new":"");
-    if(p.w==null)novos++;
-    d.innerHTML='<span class="nm"><span></span><small></small></span><select class="ps"></select><select class="ws"></select>';
-    d.querySelector(".nm span").textContent=p.name;
-    const sm=d.querySelector("small");
-    const notas=[];if(p.via)notas.push("≈ "+p.via);if(p.grupo!=null)notas.push("⛓ não cai junto com os outros do grupo");
-    if(notas.length)sm.textContent=notas.join(" · ");else sm.remove();
-    const sel=d.querySelector(".ws");
-    sel.innerHTML='<option value="">—</option>'+Array.from({length:9},(_,i)=>{const v=1+i/2;return `<option value="${v}">${String(v).replace(".",",")}</option>`}).join("");
-    sel.value=p.w==null?"":String(p.w);
-    sel.onchange=()=>{setWeight(p,sel.value===""?null:+sel.value);d.classList.toggle("new",p.w==null)};
-    const ps=d.querySelector(".ps");
-    ps.innerHTML='<option value="">Pos.</option><option value="d">Def</option><option value="a">Atq</option><option value="x">Flex</option>';
-    ps.value=p.pos||"";
-    ps.onchange=()=>setPos(p,ps.value||null);
-    box.appendChild(d);
-  });
-  if(novos)$("pesosDet").open=true;
-}
-try{if(localStorage.getItem(LS_EQ)==="0")$("eq").checked=false}catch(e){}
-$("eq").onchange=()=>{try{localStorage.setItem(LS_EQ,$("eq").checked?"1":"0")}catch(e){}};
-let confirmClear=false;
-$("limpaPesos").onclick=()=>{
-  const b=$("limpaPesos");
-  if(!confirmClear){confirmClear=true;b.textContent="Toque de novo para confirmar";setTimeout(()=>{confirmClear=false;b.textContent="Limpar pesos salvos"},3000);return}
-  confirmClear=false;b.textContent="Limpar pesos salvos";
-  saved=[];persist();state.players.forEach(p=>{p.w=null;p.via=null});render();toast("Pesos apagados");
-};
-
 document.querySelectorAll(".mode").forEach(m=>m.onclick=()=>{state.size=+m.dataset.size;save();render()});
 
 function toast(t){const el=$("toast");el.textContent=t;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2200)}
@@ -319,7 +245,7 @@ function draw(){
   if(list.length<need){toast(`A lista tem ${list.length} jogadores, precisa de ${need}`);return}
   const sh=shuffle(list);
   const pool=sh.slice(0,need),sup=sh.slice(need).map(p=>p.name);
-  const usar=$("eq").checked&&pool.some(p=>p.w!=null);
+  const usar=pool.some(p=>p.w!=null);
   let teams,sums=null;
   if(usar){const r=balancear(pool,state.size);teams=r.t.map(t=>t.map(p=>p.name));sums=r.sums}
   else{
@@ -336,7 +262,7 @@ function show(){
   const t=$("teams");t.innerHTML="";
   last.teams.forEach((tm,i)=>{
     const d=document.createElement("div");d.className="team"+(i===2?" preto":"");d.style.setProperty("--c",COLORS[i]);
-    d.innerHTML=`<h3>${NAMES[i]} <small>${last.sums?"força "+last.sums[i]:tm.length+" jogadores"}</small></h3><ol></ol>`;
+    d.innerHTML=`<h3>${NAMES[i]} <small>${tm.length} jogadores</small></h3><ol></ol>`;
     tm.forEach((n,k)=>{const li=document.createElement("li");li.innerHTML=`<i>${k+1}</i><span></span>`;li.querySelector("span").textContent=n;d.querySelector("ol").appendChild(li)});
     t.appendChild(d);
   });
