@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<title>Sorteador de Times</title>
+<style>
+  :root{
+    --bg:#0b1220; --card:#121a2e; --card2:#18223b; --line:#25314f;
+    --txt:#eaf0ff; --mut:#8b97b8; --accent:#22d3a0; --accent2:#38bdf8;
+    --t1:#38bdf8; --t2:#f472b6; --t3:#fbbf24;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    background:radial-gradient(1200px 600px at 10% -10%,#16315a55,transparent),
+               radial-gradient(900px 500px at 100% 0%,#0f5a4a40,transparent),var(--bg);
+    color:var(--txt);min-height:100vh;padding:20px 16px 60px;
+  }
+  .wrap{max-width:880px;margin:0 auto}
+  header{text-align:center;margin:10px 0 22px}
+  header .ball{font-size:38px}
+  h1{font-size:28px;letter-spacing:-.5px;margin-top:4px}
+  .sub{color:var(--mut);font-size:14px;margin-top:6px}
+  .card{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);
+    border-radius:18px;padding:18px;margin-bottom:16px;box-shadow:0 10px 30px #0006}
+  .card h2{font-size:15px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  label.f{display:block;font-size:12px;color:var(--mut);margin-bottom:4px}
+  input[type=text],input[type=date],input[type=time]{
+    width:100%;background:#0d1527;border:1px solid var(--line);color:var(--txt);
+    padding:10px 12px;border-radius:10px;font-size:15px;outline:none}
+  input:focus,textarea:focus{border-color:var(--accent2)}
+  textarea{width:100%;background:#0d1527;border:1px solid var(--line);color:var(--txt);padding:10px 12px;
+    border-radius:10px;font-size:14px;outline:none;resize:vertical;font-family:inherit}
+  .modes{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .mode{background:#0d1527;border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center;cursor:pointer;transition:.15s;color:var(--txt)}
+  .mode b{display:block;font-size:18px}
+  .mode span{font-size:12px;color:var(--mut)}
+  .mode.on{border-color:var(--accent);background:#0f2a2b;box-shadow:0 0 0 1px var(--accent) inset}
+  .players{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
+  .pl{display:flex;align-items:center;gap:8px;background:#0d1527;border:1px solid var(--line);
+    border-radius:10px;padding:8px 10px;cursor:pointer;user-select:none;transition:.15s}
+  .pl .n{font-size:11px;color:var(--mut);width:20px}
+  .pl .nm{flex:1;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pl .x{color:var(--mut);background:none;border:0;font-size:16px;cursor:pointer;padding:0 4px}
+  .pl .x:hover{color:#f87171}
+  .pl.off{opacity:.38;text-decoration:line-through}
+  .pl.on{border-color:#2b4a45}
+  .add{display:flex;gap:8px;margin-top:12px}
+  .btn{border:0;border-radius:12px;padding:12px 18px;font-weight:700;font-size:15px;cursor:pointer;color:#04130e;
+    background:linear-gradient(135deg,var(--accent),#4ade80);transition:.15s}
+  .btn:hover{transform:translateY(-1px);filter:brightness(1.08)}
+  .btn:active{transform:translateY(0)}
+  .btn.sec{background:#1d2a47;color:var(--txt);border:1px solid var(--line)}
+  .btn.wa{background:linear-gradient(135deg,#25d366,#128c7e);color:#fff}
+  .btn.big{width:100%;font-size:18px;padding:16px}
+  .count{font-size:13px;color:var(--mut);text-transform:none;letter-spacing:0}
+  .count b{color:var(--accent)}
+  .teams{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+  .team{border-radius:16px;padding:16px;background:#0d1527;border:1px solid var(--line);border-top:4px solid var(--c);
+    animation:pop .45s cubic-bezier(.2,1.4,.4,1) both}
+  .team.preto{background:#000;border-color:#4b5563;border-top-color:#9ca3af}
+  .team.preto h3{color:#fff}
+  .team:nth-child(2){animation-delay:.08s}.team:nth-child(3){animation-delay:.16s}
+  .team h3{color:var(--c);font-size:17px;margin-bottom:10px;display:flex;justify-content:space-between}
+  .team h3 small{color:var(--mut);font-weight:500}
+  .team ol{list-style:none}
+  .team li{padding:7px 0;border-top:1px dashed #25314f;font-size:15px;display:flex;gap:8px}
+  .team li i{font-style:normal;color:var(--mut);width:18px;font-size:12px;padding-top:2px}
+  .res{margin-top:14px;padding:12px;border-radius:12px;background:#1a1620;border:1px dashed #5b4a2a;font-size:14px;color:#fcd9a0}
+  .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+  @keyframes pop{from{opacity:0;transform:scale(.85) translateY(14px)}to{opacity:1;transform:none}}
+  .shake{animation:shake .12s linear infinite}
+  @keyframes shake{0%{transform:translateX(-2px)}50%{transform:translateX(2px)}100%{transform:translateX(-2px)}}
+  .hidden{display:none}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#1d2a47;border:1px solid var(--line);
+    padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:.25s}
+  .toast.show{opacity:1}
+  @media(max-width:480px){.row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="ball">⚽</div>
+    <h1>Sorteador de Times</h1>
+    <p class="sub">Cole a lista e sorteie.</p>
+  </header>
+
+  <section class="card">
+    <h2>Colar lista <span class="count">do grupo do WhatsApp</span></h2>
+    <textarea id="paste" rows="6" placeholder="Cole aqui a lista completa com local, data e jogadores…"></textarea>
+    <div class="add"><button class="btn sec" id="tplBtn" style="flex:1">📋 Copiar template</button></div>
+    <textarea id="tplBox" class="hidden" rows="8" readonly style="margin-top:10px"></textarea>  </section>
+
+  <section class="card">
+    <h2>Formato</h2>
+    <div class="modes">
+      <button class="mode on" data-size="6"><b>3 times de 6</b><span>18 jogadores</span></button>
+      <button class="mode" data-size="5"><b>3 times de 5</b><span>15 jogadores · sobra vira suplente</span></button>
+    </div>
+  </section>
+
+  <button class="btn big" id="sortear">🎲 Sortear times</button>
+
+  <section class="card hidden" id="resultado" style="margin-top:16px">
+    <h2>Resultado</h2>
+    <div class="teams" id="teams"></div>
+    <div class="res hidden" id="suplentes"></div>
+    <div class="actions">
+      <button class="btn sec" id="resortear">🔁 Sortear de novo</button>
+      <button class="btn wa" id="whats">📲 Enviar no WhatsApp</button>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const COLORS=["#3b82f6","#ef4444","#000000"];
+const NAMES=["Time Azul","Time Vermelho","Time Preto"];
+const EMOJI=["🔵","🔴","⚫"];
+const $=id=>document.getElementById(id);
+let state={players:[],size:6};
+let last=null;
+function save(){} // nada é salvo: F5 limpa tudo
+
+let meta={local:"",data:"",hora:""};
+
+function rnd(n){const a=new Uint32Array(1);const lim=Math.floor(4294967296/n)*n;
+  do{crypto.getRandomValues(a)}while(a[0]>=lim);return a[0]%n}
+function shuffle(arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a}
+
+function render(){
+  document.querySelectorAll(".mode").forEach(m=>m.classList.toggle("on",+m.dataset.size===state.size));
+}
+
+document.querySelectorAll(".mode").forEach(m=>m.onclick=()=>{state.size=+m.dataset.size;save();render()});
+
+function toast(t){const el=$("toast");el.textContent=t;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2200)}
+
+function draw(){
+  const pool=state.players.filter(p=>p.on).map(p=>p.name);
+  const need=state.size*3;
+  if(!pool.length){toast("Cole a lista primeiro");return}
+  if(pool.length<need){toast(`A lista tem ${pool.length} jogadores, precisa de ${need}`);return}
+  const sh=shuffle(pool);
+  const teams=[0,1,2].map(i=>sh.slice(i*state.size,(i+1)*state.size));
+  const sup=sh.slice(need);
+  last={teams,sup};
+  $("resultado").classList.remove("hidden");
+  const t=$("teams");t.classList.add("shake");
+  setTimeout(()=>{t.classList.remove("shake");show()},450);
+}
+function show(){
+  const t=$("teams");t.innerHTML="";
+  last.teams.forEach((tm,i)=>{
+    const d=document.createElement("div");d.className="team"+(i===2?" preto":"");d.style.setProperty("--c",COLORS[i]);
+    d.innerHTML=`<h3>${NAMES[i]} <small>${tm.length} jogadores</small></h3><ol></ol>`;
+    tm.forEach((n,k)=>{const li=document.createElement("li");li.innerHTML=`<i>${k+1}</i><span></span>`;li.querySelector("span").textContent=n;d.querySelector("ol").appendChild(li)});
+    t.appendChild(d);
+  });
+  const s=$("suplentes");
+  if(last.sup.length){s.classList.remove("hidden");s.textContent="🪑 Suplentes: "+last.sup.join(", ")}else s.classList.add("hidden");
+  $("resultado").scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+function fmtData(){
+  const v=meta.data;if(!v)return"";const [y,m,d]=v.split("-");
+  const dias=["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
+  return `${dias[new Date(v+"T12:00:00").getDay()]}${meta.hora?" "+meta.hora.slice(0,2)+"h":""} - ${d}/${m}/${y.slice(2)}`;
+}
+function msg(){
+  let m="";
+  if(meta.local)m+=`🏟 *${meta.local}* 🥅\n`;
+  if(fmtData())m+=`📅 *${fmtData()}*\n`;
+  if(m)m+="\n";
+  last.teams.forEach((tm,i)=>{
+    m+=`${EMOJI[i]} *${NAMES[i]}*\n`;
+    tm.forEach(n=>m+=`🎽 ${n}\n`);
+    m+="\n";
+  });
+  if(last.sup.length)m+=`🪑 *Suplentes:* ${last.sup.join(", ")}\n\n`;
+  return m.trim();
+}
+function clean(s){return s.replace(/[*_~]/g,"").replace(/[\u{1F000}-\u{1FFFF}\u2600-\u27BF\uFE0F\u20E3\u2756]/gu,"").trim()}
+function parseList(text){
+  const lines=text.split(/\r?\n/);
+  const players=[];let stop=false;meta={local:"",data:"",hora:""};
+  for(const raw of lines){
+    const l=raw.trim();if(!l)continue;
+    if(/goleiro|suplente/i.test(l)){stop=true;continue}
+    if(stop)continue;
+    if(l.includes("🏟")){const v=clean(l).replace(/^(local|campo)\s*:\s*/i,"");if(v)meta.local=v;continue}
+    if(l.includes("📅")){
+      const d=l.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+      if(d){const y=d[3].length===2?"20"+d[3]:d[3];meta.data=`${y}-${d[2].padStart(2,"0")}-${d[1].padStart(2,"0")}`}
+      const h=l.match(/(\d{1,2})\s*(?:h|:)\s*(\d{2})?/i);
+      if(h)meta.hora=`${h[1].padStart(2,"0")}:${(h[2]||"00")}`;
+      continue;
+    }
+    if(l.includes("❖")){const v=clean(l).replace(/^contato\s*:\s*/i,"");if(v)meta.contato=v;continue}
+    const m=l.match(/^\D{0,4}?\s*(\d{1,2})\s*[-–.)]\s*(.+)$/u)||l.match(/🎽\s*(\d{1,2})\s*[-–]\s*(.+)$/u);
+    if(m){const n=clean(m[2]);if(n)players.push({name:n,on:true})}
+  }
+  return players;
+}
+function importar(){
+  const p=parseList($("paste").value);
+  state.players=p;render();last=null;$("resultado").classList.add("hidden");
+}
+$("paste").addEventListener("input",importar);
+function template(){
+  let t=`🏟 *Local:* 🥅
+📅 *Data e hora:*
+❖ Contato:
+`;
+  for(let i=1;i<=18;i++)t+=`🎽${String(i).padStart(2,"0")} - 
+`;
+  t+=`
+- *Goleiros: ( não paga )*
+🥅 - 
+🥅 - 
+
+- *SUPLENTES:*
+1️⃣ - 
+2️⃣ - `;
+  return t;
+}
+async function copiar(txt){
+  try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(txt);return true}}catch(e){}
+  try{
+    const a=document.createElement("textarea");a.value=txt;a.setAttribute("readonly","");
+    a.style.cssText="position:fixed;top:0;left:0;opacity:0";document.body.appendChild(a);
+    a.focus();a.select();a.setSelectionRange(0,txt.length);
+    const ok=document.execCommand("copy");a.remove();if(ok)return true;
+  }catch(e){}
+  return false;
+}
+$("tplBtn").onclick=async()=>{
+  const txt=template();
+  if(await copiar(txt)){$("tplBox").classList.add("hidden");toast("Template copiado! Cola no grupo");return}
+  const b=$("tplBox");b.classList.remove("hidden");b.value=txt;b.focus();b.select();
+  toast("Seu navegador bloqueou. Selecionei o texto: use Ctrl+C");
+};
+$("sortear").onclick=draw;$("resortear").onclick=draw;
+$("whats").onclick=()=>{if(!last)return;window.open("https://wa.me/?text="+encodeURIComponent(msg()),"_blank")};
+render();
+</script>
+</body>
+</html>
