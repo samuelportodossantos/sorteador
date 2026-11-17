@@ -135,9 +135,9 @@ let last=null;
 function save(){} // a lista não é salva: F5 limpa. Só os pesos ficam no aparelho.
 const DEFAULT_W=1; // nome novo (que não está na lista de pesos) conta como o pior
 // pesos iniciais (1 a 5) e posição: d = defensor, a = atacante, x = flex (qualquer posição)
-const SEED=[["Davy","d",5],["Cleison","a",5],["Pedro","d",4],["Diogo","d",3],["Jony Ar","a",3],["Jhonny Mendes","x",2],
-  ["Zairon","x",3],["Julio Jr","a",2],["Samuel","x",3.5],["Denis","a",4],["Gabriel","a",3],["Alisson","a",3],
-  ["Brendo","x",4],["Elisson","a",5],["Rafael","x",2],["Levi","d",3],["Danilo","a",3],["Valber","a",3]]
+const SEED=[["Davy","d",5],["Cleison","a",5],["Pedro","d",2.5],["Diogo","d",3],["Jony Ar","a",3],["Jhonny Mendes","x",2],
+  ["Zairon","x",4],["Julio Jr","a",2],["Samuel","x",3.5],["Denis","a",4],["Gabriel","a",2],["Alisson","a",3],
+  ["Brendo","x",4],["Elisson","a",5],["Rafael","x",2],["Levi","d",3],["Danilo","a",3],["Valber","a",3],["Italo","x",5]]
   .map(([name,pos,w])=>({name,pos,w}));
 const saved=SEED;
 try{["sorteador-pesos","sorteador-eq"].forEach(k=>localStorage.removeItem(k))}catch(e){}
@@ -188,13 +188,13 @@ function buscar(lista,name){
 }
 function findMatch(name){return buscar(saved,name)}
 
-// grupos que NÃO podem cair todos no mesmo time (no máximo 2 do grupo juntos)
+// grupos cujos membros NUNCA podem cair no mesmo time (no máximo 1 do grupo por time)
 const GRUPOS=[["Julio Jr","Jhonny Mendes","Samuel"]];
 const GRUPO_ENTRIES=GRUPOS.flatMap((g,i)=>g.map(name=>({name,g:i})));
 function valido(times){
   return times.every(t=>{
     const c={};for(const p of t)if(p.grupo!=null)c[p.grupo]=(c[p.grupo]||0)+1;
-    return Object.values(c).every(n=>n<=2);
+    return Object.values(c).every(n=>n<=1);
   });
 }
 let meta={local:"",data:"",hora:""};
