@@ -159,7 +159,7 @@ function lev(a,b){
 // "jr" é abreviação de "junior", "ar" de "arthur", "samuel" de "samuel porto"
 function abrev(t,u){
   if(t===u)return true;
-  if(t.length<2||t[0]!==u[0])return false;
+  if(t.length<1||t[0]!==u[0])return false;
   if(u.startsWith(t))return true;
   if(t.length>3)return false;
   let i=0;for(const c of u)if(c===t[i])i++;
@@ -190,7 +190,19 @@ function findMatch(name){return buscar(saved,name)}
 
 // grupos cujos membros NUNCA podem cair no mesmo time (no máximo 1 do grupo por time)
 const GRUPOS=[["Julio Jr","Jhonny Mendes","Samuel"]];
-const GRUPO_ENTRIES=GRUPOS.flatMap((g,i)=>g.map(name=>({name,g:i})));
+// apelidos/variações que também contam como a pessoa do grupo (o casamento aproximado cobre o resto)
+const APELIDOS=[["Julio Jr","Julinho","Julio Junior"],["Jhonny Mendes","Jhonny M","Johnny M","Mendes","J Mendes"],["Samuel","Samuca","Sam","Samuel Porto"]];
+// casa por pessoa (nome + apelidos juntos), assim os apelidos não geram empate entre si
+const GRUPO_PESSOAS=GRUPOS.flatMap((g,i)=>g.map(name=>({g:i,entries:(APELIDOS.find(a=>a[0]===name)||[name]).map(n=>({name:n}))})));
+function grupoDe(name){
+  const n=norm(name);if(!n)return null;
+  const need=n.length<=5?.85:.8;
+  const sc=GRUPO_PESSOAS.map(p=>({g:p.g,s:Math.max(...p.entries.map(e=>similarity(n,norm(e.name))))}))
+    .filter(x=>x.s>=need).sort((a,b)=>b.s-a.s);
+  if(!sc.length)return null;
+  if(sc.length>1&&sc[0].s<1&&sc[1].s===sc[0].s)return null; // empate entre pessoas diferentes: não chuta
+  return sc[0].g;
+}
 function valido(times){
   return times.every(t=>{
     const c={};for(const p of t)if(p.grupo!=null)c[p.grupo]=(c[p.grupo]||0)+1;
@@ -314,8 +326,8 @@ function parseList(text){
 function importar(){
   const p=parseList($("paste").value).map(x=>{
     const m=findMatch(x.name);
-    const gm=buscar(GRUPO_ENTRIES,x.name);
-    return {name:x.name,grupo:gm?gm.entry.g:null,w:m&&m.entry.w!=null?m.entry.w:null,pos:m?m.entry.pos||null:null,via:m&&m.score<1&&norm(m.entry.name)!==norm(x.name)?m.entry.name:null};
+    const gr=grupoDe(x.name);
+    return {name:x.name,grupo:gr,w:m&&m.entry.w!=null?m.entry.w:null,pos:m?m.entry.pos||null:null,via:m&&m.score<1&&norm(m.entry.name)!==norm(x.name)?m.entry.name:null};
   });
   state.players=p;render();last=null;$("resultado").classList.add("hidden");
 }
